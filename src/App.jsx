@@ -1,28 +1,81 @@
-import { useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import Hero from './components/Hero'
+import Toolbar from './components/Toolbar'
+import Cards from './components/Cards'
 
-function App() {
-  const [count, setCount] = useState(0)
+const API = import.meta.env.VITE_BACKEND_URL || ''
 
+async function apiGet(path) {
+  const res = await fetch(`${API}${path}`)
+  if (!res.ok) throw new Error('Request failed')
+  return res.json()
+}
+
+async function apiPost(path, body) {
+  const res = await fetch(`${API}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  })
+  if (!res.ok) throw new Error('Request failed')
+  return res.json()
+}
+
+function Header() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-lg">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">
-          Vibe Coding Platform
-        </h1>
-        <p className="text-gray-600 mb-6">
-          Your AI-powered development environment
-        </p>
-        <div className="text-center">
-          <button
-            onClick={() => setCount(count + 1)}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded"
-          >
-            Count is {count}
-          </button>
+    <header className="w-full py-4">
+      <div className="max-w-6xl mx-auto px-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500" />
+          <span className="font-semibold text-neutral-900">Mezzofy SME Curator</span>
         </div>
+        <a href="https://www.mezzofy.com" target="_blank" rel="noreferrer" className="text-sm text-neutral-600 hover:text-orange-600">Visit mezzofy.com</a>
       </div>
-    </div>
+    </header>
   )
 }
 
-export default App
+export default function App() {
+  const [pages, setPages] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  const loadPages = useCallback(async (q) => {
+    setLoading(true)
+    try {
+      const data = await apiGet(`/pages${q ? `?q=${encodeURIComponent(q)}` : ''}`)
+      setPages(data)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    try {
+      await apiPost('/crawl', { max_pages: 20 })
+      await loadPages()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }, [loadPages])
+
+  useEffect(() => {
+    loadPages()
+  }, [loadPages])
+
+  return (
+    <div className="min-h-screen bg-white text-neutral-900">
+      <Header />
+      <Hero />
+      <Toolbar onRefresh={refresh} onSearch={loadPages} />
+      <Cards pages={pages} loading={loading} />
+      <footer className="py-10 text-center text-sm text-neutral-500">
+        Built with warm orange accents and a minimalist feel.
+      </footer>
+    </div>
+  )
+}
